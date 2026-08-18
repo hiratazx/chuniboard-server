@@ -112,8 +112,26 @@ void chuni_io_jvs_poll(uint8_t *opbtn, uint8_t *beams)
         }
     }
 
-    for (i = 0 ; i < 6 ; i++) {
-        if ((chuni_io_file_mapping && chuni_io_file_mapping->airIoStatus[i]) || chuni_io_hand_pos > i) {
+    if (chuni_io_file_mapping) {
+        /*
+         * The Android app encodes air sensors using a YUANCON physical index
+         * (mAirIdx=[4,5,2,3,0,1]), so airIoStatus bits are NOT sequential from
+         * bit 0. Mapping them 1:1 to beam bits produces non-cumulative patterns
+         * that the game ignores (e.g. only bit 1 set → hand not detected).
+         *
+         * Fix: count total active sensors and generate the correct cumulative
+         * mask (all bits 0..N-1 set = N beams blocked from the bottom up).
+         */
+        uint8_t active = 0;
+        for (i = 0; i < 6; i++) {
+            if (chuni_io_file_mapping->airIoStatus[i]) active++;
+        }
+        for (i = 0; i < active; i++) {
+            *beams |= (1 << i);
+        }
+    } else if (chuni_io_hand_pos > 0) {
+        /* keyboard fallback: cumulative mask up to hand_pos */
+        for (i = 0; i < chuni_io_hand_pos; i++) {
             *beams |= (1 << i);
         }
     }
