@@ -34,6 +34,8 @@ ADD_LIBRARY(chuniio SHARED
     # Utility helpers (vendored from segatools/common/util)
     ../util/dprintf.c
     ../util/env.c
+    # Module definition file – exports all chuni_io_* symbols by name (no mangling)
+    chunihook.def
 )
 
 SET_TARGET_PROPERTIES(chuniio PROPERTIES OUTPUT_NAME "chunihook")
