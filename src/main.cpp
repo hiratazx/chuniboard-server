@@ -213,6 +213,11 @@ uint32_t last_input_packet_id = 0;
 
 void updatePacketId(uint32_t newId)
 {
+    // Only advance monotonically: ignore stale out-of-order UDP packets.
+    // If we set last_id backwards, every subsequent in-order packet would
+    // falsely appear as a huge drop, flooding the log with noise.
+    if (newId <= last_input_packet_id) return;
+
     if (newId > last_input_packet_id + 1 && last_input_packet_id != 0)
         printErr("[WARN] Dropped %u packet(s) before #%u\n",
                  newId - last_input_packet_id - 1, newId);
