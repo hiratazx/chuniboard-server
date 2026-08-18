@@ -15,8 +15,9 @@ ELSE()
 ENDIF()
 
 # Root of the vendored segatools tree (one level up from this CMakeLists).
-# This makes #include "chuniio/foo.h" and #include "util/bar.h" resolve correctly.
-SET(SEGATOOLS_ROOT "${CMAKE_SOURCE_DIR}/..")
+# Use CMAKE_CURRENT_SOURCE_DIR so this resolves correctly both as a
+# standalone project and when included via ADD_SUBDIRECTORY.
+SET(SEGATOOLS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 # chunihook.dll – the segatools I/O plugin
 ADD_LIBRARY(chuniio SHARED

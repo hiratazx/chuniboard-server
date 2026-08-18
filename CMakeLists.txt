@@ -17,7 +17,7 @@ ENDIF()
 IF(NOT MSVC)
     ADD_COMPILE_OPTIONS(-Wall -Wextra -Wno-unused-parameter -Wno-unused-result)
 ELSE()
-    ADD_COMPILE_OPTIONS(/W4)
+    ADD_COMPILE_OPTIONS(/W4 /D_CRT_SECURE_NO_WARNINGS)
     # Statically link CRT – no ucrtbased.dll / VCRUNTIME140D.dll required
     SET(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 ENDIF()
