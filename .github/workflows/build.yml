@@ -1,0 +1,54 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+  create:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86
+
+      - name: Configure (Debug)
+        if: github.event_name == 'push'
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Configure (Release)
+        if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/v')
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Collect artifacts
+        run: |
+          mkdir dist
+          copy build\chunithm_server.exe dist\
+          copy build\segatools\chuniio\chunihook.dll dist\
+          copy scripts\deploy.ps1 dist\
+
+      - name: Upload artifact (Debug)
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: chuniboard-chunithm-server-debug
+          path: dist\
+
+      - name: Package release ZIP
+        if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/v')
+        run: Compress-Archive -Path dist\* -DestinationPath chuniboard-chunithm-server-${{ github.ref_name }}.zip
+
+      - name: Upload release
+        if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: chuniboard-chunithm-server-${{ github.ref_name }}.zip
