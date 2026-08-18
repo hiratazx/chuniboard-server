@@ -407,7 +407,9 @@ void threadInputReceive(SOCKET sHost, IPCMemoryInfo *memory)
             memory->remoteCardRead = pkt->remoteCardRead;
             memory->remoteCardType = pkt->remoteCardType;
             memcpy(memory->remoteCardId, pkt->remoteCardId, 10);
-            {
+            // The app sends a CRD packet on every tick to broadcast card state
+            // (present=1 / absent=0). Only log when a card is actually tapped.
+            if (pkt->remoteCardRead) {
                 char _hex[21] = {};
                 for (int _i = 0; _i < 10; _i++)
                     snprintf(_hex + _i*2, 3, "%02X", (unsigned char)pkt->remoteCardId[_i]);
