@@ -10,7 +10,8 @@
 
 #include "aimeio/aimeio.h"
 
-#include "util/crc.h"
+/* Note: util/crc.h is intentionally omitted — it is not present in the
+ * vendored util dir and no CRC functions are actually called here. */
 #include "util/dprintf.h"
 
 struct aime_io_config {
@@ -41,9 +42,9 @@ struct aime_io_ipc_memory_info
 };
 typedef struct aime_io_ipc_memory_info aime_io_ipc_memory_info;
 static HANDLE aime_io_file_mapping_handle;
-aime_io_ipc_memory_info* aime_io_file_mapping;
+static aime_io_ipc_memory_info *aime_io_file_mapping;
 
-void aime_io_init_shared_memory()
+static void aime_io_init_shared_memory(void)
 {
     if (aime_io_file_mapping)
     {
@@ -240,6 +241,10 @@ HRESULT aime_io_nfc_poll(uint8_t unit_no)
 			aime_io_felica_id_present = true;
 			break;
 		}
+		/* Consume the event — clear the flag so the game only sees the card once
+		 * per tap. Without this every subsequent poll would report the same card,
+		 * causing the game to loop the login sequence indefinitely. */
+		aime_io_file_mapping->remoteCardRead = 0;
 		return S_OK;
 	}
 

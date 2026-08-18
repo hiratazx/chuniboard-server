@@ -32,3 +32,6 @@ TARGET_LINK_LIBRARIES(chunithm_server ws2_32)
 
 # ── chuniio hook DLL (segatools path32=) ─────────────────────────────────────
 ADD_SUBDIRECTORY(segatools/chuniio)
+
+# ── aimeio hook DLL (segatools aimeio=) ──────────────────────────────────────
+ADD_SUBDIRECTORY(segatools/aimeio)
