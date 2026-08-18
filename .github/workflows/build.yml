@@ -34,7 +34,6 @@ jobs:
           mkdir dist
           copy build\chunithm_server.exe dist\
           copy build\segatools\chuniio\chunihook.dll dist\
-          copy scripts\deploy.ps1 dist\
 
       - name: Upload artifact (Debug)
         if: github.event_name == 'push'
