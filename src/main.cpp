@@ -181,6 +181,15 @@ void printErr(const char *fmt, Args... args)
     fprintf(stderr, fmt, args...);
 }
 
+// ── Debug verbose logging (compiled out in NDEBUG/Release builds) ─────────────
+// Build with -DCMAKE_BUILD_TYPE=Debug to enable. Output goes to stderr.
+#ifndef NDEBUG
+#  define VERBOSE(fmt, ...) printErr("[DBG] " fmt, ##__VA_ARGS__)
+#else
+#  define VERBOSE(fmt, ...) ((void)0)
+#endif
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── LED broadcast thread ──────────────────────────────────────────────────────
 void threadLEDBroadcast(SOCKET sHost, const IPCMemoryInfo *memory)
 {
@@ -296,6 +305,28 @@ void threadInputReceive(SOCKET sHost, IPCMemoryInfo *memory)
             memory->serviceBtn = pkt->serviceBtn;
             current_packet_id  = ntohl(pkt->packetId);
             updatePacketId(current_packet_id);
+#ifndef NDEBUG
+            {
+                static uint8_t dbg_air[6]  = {};
+                static uint8_t dbg_sld[32] = {};
+                static uint8_t dbg_test    = 0, dbg_svc = 0;
+                bool ac = memcmp(dbg_air, pkt->airIoStatus,    6)  != 0;
+                bool sc = memcmp(dbg_sld, pkt->sliderIoStatus, 32) != 0;
+                bool bc = (dbg_test != pkt->testBtn) || (dbg_svc != pkt->serviceBtn);
+                if (ac || sc || bc) {
+                    memcpy(dbg_air, pkt->airIoStatus,    6);
+                    memcpy(dbg_sld, pkt->sliderIoStatus, 32);
+                    dbg_test = pkt->testBtn; dbg_svc = pkt->serviceBtn;
+                    uint8_t airBits = 0;
+                    for (int _i = 0; _i < 6;  _i++) if (pkt->airIoStatus[_i])           airBits |= (uint8_t)(1u << _i);
+                    int sldCnt = 0;
+                    for (int _i = 0; _i < 32; _i++) if (pkt->sliderIoStatus[_i] >= 20)  sldCnt++;
+                    VERBOSE("INP #%-5u  air=0x%02X  slider=%d/32  test=%d svc=%d\n",
+                            current_packet_id, airBits, sldCnt,
+                            pkt->testBtn, pkt->serviceBtn);
+                }
+            }
+#endif
         }
         // Input (without air)
         else if (packet_len >= sizeof(PacketInputNoAir) &&
@@ -307,6 +338,22 @@ void threadInputReceive(SOCKET sHost, IPCMemoryInfo *memory)
             memory->serviceBtn = pkt->serviceBtn;
             current_packet_id  = ntohl(pkt->packetId);
             updatePacketId(current_packet_id);
+#ifndef NDEBUG
+            {
+                static uint8_t dbg_sld[32] = {};
+                static uint8_t dbg_test    = 0, dbg_svc = 0;
+                bool sc = memcmp(dbg_sld, pkt->sliderIoStatus, 32) != 0;
+                bool bc = (dbg_test != pkt->testBtn) || (dbg_svc != pkt->serviceBtn);
+                if (sc || bc) {
+                    memcpy(dbg_sld, pkt->sliderIoStatus, 32);
+                    dbg_test = pkt->testBtn; dbg_svc = pkt->serviceBtn;
+                    int sldCnt = 0;
+                    for (int _i = 0; _i < 32; _i++) if (pkt->sliderIoStatus[_i] >= 20) sldCnt++;
+                    VERBOSE("IPT #%-5u  slider=%d/32  test=%d svc=%d\n",
+                            current_packet_id, sldCnt, pkt->testBtn, pkt->serviceBtn);
+                }
+            }
+#endif
         }
         // Function button (coin / card)
         else if (packet_len >= sizeof(PacketFunction) &&
@@ -315,6 +362,9 @@ void threadInputReceive(SOCKET sHost, IPCMemoryInfo *memory)
             auto *pkt = reinterpret_cast<PacketFunction *>(buffer);
             if (pkt->funcBtn == FUNCTION_COIN) memory->coinInsertion = 1;
             if (pkt->funcBtn == FUNCTION_CARD) memory->cardRead      = 1;
+            VERBOSE("FNC  button=%s\n",
+                    pkt->funcBtn == FUNCTION_COIN ? "COIN" :
+                    pkt->funcBtn == FUNCTION_CARD ? "CARD" : "?");
         }
         // Connect
         else if (packet_len >= sizeof(PacketConnect) &&
@@ -357,12 +407,22 @@ void threadInputReceive(SOCKET sHost, IPCMemoryInfo *memory)
             memory->remoteCardRead = pkt->remoteCardRead;
             memory->remoteCardType = pkt->remoteCardType;
             memcpy(memory->remoteCardId, pkt->remoteCardId, 10);
+            {
+                char _hex[21] = {};
+                for (int _i = 0; _i < 10; _i++)
+                    snprintf(_hex + _i*2, 3, "%02X", (unsigned char)pkt->remoteCardId[_i]);
+                VERBOSE("CRD  type=%-6s  id=%s\n",
+                        pkt->remoteCardType == CARD_FELICA ? "FeliCa" : "Aime", _hex);
+            }
         }
 
         // Emit keyboard events if --kb flag is set
         if (kb_mode && CONNECTED) {
             uint64_t kb_cur = make_kb_state(memory);
             if (kb_cur != kb_prev) {
+                VERBOSE("KB   air=0x%02X  sliders=%d/32\n",
+                        (unsigned)((kb_cur >> 32) & 0x3F),
+                        /* popcount lo32 */ [&]{ int n=0; for(int _i=0;_i<32;_i++) n+=(int)((kb_cur>>_i)&1); return n; }());
                 send_keyboard(kb_prev, kb_cur);
                 kb_prev = kb_cur;
             }
@@ -383,6 +443,9 @@ void printInfo()
     printf("  (default)  write to BROKENITHM_SHARED_BUFFER\n");
     printf("             (use segatools.ini [chuniio] path32=chunihook.dll)\n");
     printf("  --kb       also emit Yuancon keyboard events\n\n");
+#ifndef NDEBUG
+    printf("[DEBUG BUILD \xe2\x80\x94 verbose console logging enabled]\n\n");
+#endif
 }
 
 void checkArgs(int argc, char *argv[])
